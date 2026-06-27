@@ -202,8 +202,3 @@ curl -X GET http://localhost:8080/debug
 ```
 
 ---
-
-## Future Roadmap (v0.2.0+)
-- **Disk Persistence (Write-Ahead Logging)**: Write LogManager operations to disk in binary WAL files to persist state across node reboots.
-- **Raft Consensus Integration**: Replace heartbeats and ad-hoc leader promotions with an active Raft consensus group.
-- **Dynamic Topology Scaling**: Support adding/removing nodes on the fly without causing complete cache invalidations.
