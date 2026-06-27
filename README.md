@@ -4,35 +4,7 @@ Atlas is a lightweight, distributed, in-memory key-value store designed to demon
 
 ---
 
-## Architecture Overview
 
-Atlas routes key-value operations dynamically through a hash ring using consistent hashing. Values are replicated to multiple backup nodes on the ring to prevent data loss in the event of node crashes.
-
-```mermaid
-flowchart TD
-    Client[HTTP Client]
-    Router[Router]
-    Replicator[Replicator]
-    HashRing[Consistent HashRing]
-    Log[LogStore / LogManager]
-    NodeA[Node A]
-    NodeB[Node B]
-    NodeC[Node C]
-
-    Client -->|GET| Router
-    Client -->|POST / DELETE| Replicator
-    
-    Router -->|Determines primary| HashRing
-    Replicator -->|Determines replicas| HashRing
-    Replicator -->|Writes operation| Log
-    
-    Router -->|Fetches value| NodeB
-    Replicator -->|Replicates mutations| NodeA
-    Replicator -->|Replicates mutations| NodeB
-    Replicator -->|Replicates mutations| NodeC
-```
-
----
 
 ## Core Features
 
@@ -100,11 +72,12 @@ go run cmd/node/main.go
 
 ---
 
-## Example API Usage
+## Example API Usage (End-to-End Walkthrough)
 
-Below is a summary of the HTTP API endpoints. You can also import the pre-configured Postman Collection file `postman.json` at the root of the project to test these routes.
+Here is a step-by-step walkthrough to test consistent hashing, replica routing, failover, and incremental log recovery using `curl`. You can also import the pre-configured Postman Collection file `postman.json` at the root of the project to test these routes.
 
-### 1. Check Cluster Status
+### Step 1: Check Initial Cluster Status
+Check that all three nodes are healthy and running:
 ```bash
 curl -X GET http://localhost:8080/cluster
 ```
@@ -117,51 +90,88 @@ curl -X GET http://localhost:8080/cluster
 ]
 ```
 
-### 2. Set a Cache Key
+### Step 2: Store Initial Data
+Write a key to the cluster. The hash ring will map this write to a primary node and replicate it to backup nodes:
 ```bash
 curl -X POST http://localhost:8080/cache \
   -H "Content-Type: application/json" \
-  -d '{"key": "user_99", "value": "active_session"}'
+  -d '{"key": "user_1", "value": "premium"}'
 ```
-**Response:**
+**Response:** (Indicates which node has the primary mapping)
 ```json
 {
   "stored_on": "node-B"
 }
 ```
 
-### 3. Get a Cache Key
+Write a second key to advance the operation sequence:
 ```bash
-curl -X GET http://localhost:8080/cache/user_99
-```
-**Response:**
-```json
-{
-  "node": "node-B",
-  "value": "active_session"
-}
+curl -X POST http://localhost:8080/cache \
+  -H "Content-Type: application/json" \
+  -d '{"key": "user_2", "value": "standard"}'
 ```
 
-### 4. Delete a Cache Key
-```bash
-curl -X DELETE http://localhost:8080/cache/user_99
-```
-**Response:**
-```json
-{
-  "deleted_from": "node-B"
-}
-```
-
-### 5. Simulate Node Failure (Kill Node)
+### Step 3: Simulate Node Outage
+Kill the node that was returned as `stored_on` in Step 2 (e.g., `node-B`):
 ```bash
 curl -X POST http://localhost:8080/kill/node-B
 ```
 **Response:** `204 No Content`
 
-*(Reads to `user_99` will now automatically failover and resolve through healthy backup nodes, such as `node-C`).*
+### Step 4: Write Mutations and Check Failover
+Perform a new write operation while `node-B` is dead:
+```bash
+curl -X POST http://localhost:8080/cache \
+  -H "Content-Type: application/json" \
+  -d '{"key": "user_3", "value": "trial"}'
+```
 
-### 6. Recover and Revive Node
+Reading `user_1` (whose primary owner `node-B` is dead) will transparently failover and serve data from a healthy replica on the hash ring:
+```bash
+curl -X GET http://localhost:8080/cache/user_1
+```
+**Response:** (Served from replica node-C)
+```json
+{
+  "node": "node-C",
+  "value": "premium"
+}
+```
+
+### Step 5: Check Debug State (Before Recovery)
+Query the detailed telemetry endpoint. You will observe that `node-B` is offline (`alive: false`), its `last_sequence` is stuck at `2`, and it is missing the `user_3` key:
+```bash
+curl -X GET http://localhost:8080/debug
+```
+**Response:**
+```json
+{
+  "node-A": {
+    "id": "node-A",
+    "alive": true,
+    "keys": 3,
+    "last_sequence": 3,
+    "data": { "user_1": "premium", "user_2": "standard", "user_3": "trial" }
+  },
+  "node-B": {
+    "id": "node-B",
+    "alive": false,
+    "keys": 2,
+    "last_sequence": 2,
+    "data": { "user_1": "premium", "user_2": "standard" }
+  },
+  "node-C": {
+    "id": "node-C",
+    "alive": true,
+    "keys": 3,
+    "last_sequence": 3,
+    "data": { "user_1": "premium", "user_2": "standard", "user_3": "trial" }
+  }
+}
+```
+
+### Step 6: Revive & Trigger Incremental Log Recovery
+Trigger node recovery for `node-B`. The system will fetch the missed operations (sequences greater than `2`) from the log manager, batch-replay them to the node while it is offline, and then revive its heartbeats:
 ```bash
 curl -X POST http://localhost:8080/revive/node-B
 ```
@@ -170,6 +180,24 @@ curl -X POST http://localhost:8080/revive/node-B
 {
   "status": "revived",
   "node": "node-B"
+}
+```
+
+### Step 7: Verify Recovery Reconcile (After Recovery)
+Query the debug endpoint again. Verify that `node-B` has caught up to sequence `3`, and the missing key `user_3` has been successfully restored to its local storage map:
+```bash
+curl -X GET http://localhost:8080/debug
+```
+**Response:** (Reconciled state)
+```json
+{
+  "node-B": {
+    "id": "node-B",
+    "alive": true,
+    "keys": 3,
+    "last_sequence": 3,
+    "data": { "user_1": "premium", "user_2": "standard", "user_3": "trial" }
+  }
 }
 ```
 
