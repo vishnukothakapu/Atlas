@@ -37,10 +37,10 @@ flowchart TD
 ## Core Features
 
 1. **Consistent Hashing & Dynamic Ring Routing**: Distributes keys evenly across active nodes using CRC32 checksum rings.
-2. **Replication Group Consensus**: Automatically replicates Set and Delete mutations to $N=3$ logical nodes in key-hash order.
+2. **Replication Group Consistency**: Automatically replicates Set and Delete mutations to $N=3$ logical nodes in key-hash order, maintaining a monotonic sequence ID per operation.
 3. **Heartbeat Failure Detection**: Uses background detectors to continuously verify node health. If a heartbeat expires (default timeout 5s), the node is marked DEAD and replica failover is triggered.
 4. **Transparent Failover Routing**: Client GET requests are automatically rerouted to the next available healthy replica on the hash ring if the primary owner node dies.
-5. **Offline Log Replay Recovery**: Restores lost nodes by replaying missing log sequences batch-wise while the node remains offline, before reviving heartbeats and placing it back into active service.
+5. **Incremental Offline Log Recovery**: Reconstructs state on a revived node by replaying *only* the missed operations (via sequence tracking `GetAfter(LastSequence)`) in a single batch while offline, avoiding costly full-database transfers before reviving heartbeats.
 
 ---
 

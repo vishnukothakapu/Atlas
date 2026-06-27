@@ -1,0 +1,177 @@
+{
+    "info": {
+        "_postman_id": "a9b9a67a-1111-2222-3333-abcdef123456",
+        "name": "Atlas KV Store",
+        "description": "API collection for the Atlas Distributed Key-Value Store",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Get Cluster Status",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/cluster",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "cluster"
+                    ]
+                },
+                "description": "Get the current list of nodes in the cluster and their alive status."
+            },
+            "response": []
+        },
+        {
+            "name": "Get Debug Info",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/debug",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "debug"
+                    ]
+                },
+                "description": "Retrieve detailed debug information for all nodes, including stored keys/values, heartbeat ages, and sequences."
+            },
+            "response": []
+        },
+        {
+            "name": "Set Cache Key",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"key\": \"user_12345\",\n    \"value\": \"premium_subscription\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/cache",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "cache"
+                    ]
+                },
+                "description": "Write a key-value pair to the cluster. The hash ring will determine which node stores the key."
+            },
+            "response": []
+        },
+        {
+            "name": "Get Cache Key",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/cache/user_12345",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "cache",
+                        "user_12345"
+                    ]
+                },
+                "description": "Retrieve the value for a specific key from the cluster."
+            },
+            "response": []
+        },
+        {
+            "name": "Kill Node",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/kill/node-B",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "kill",
+                        "node-B"
+                    ]
+                },
+                "description": "Simulate a node failure by killing the specified node (e.g., node-B)."
+            },
+            "response": []
+        },
+        {
+            "name": "Revive Node",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/revive/node-B",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "revive",
+                        "node-B"
+                    ]
+                },
+                "description": "Revive the specified node (e.g., node-B) and trigger recovery to reconcile missing data."
+            },
+            "response": []
+        },
+        {
+            "name": "Delete Cache Key",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/cache/user_12345",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "cache",
+                        "user_12345"
+                    ]
+                },
+                "description": "Delete the specified key from the cluster."
+            },
+            "response": []
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8080",
+            "type": "string"
+        }
+    ]
+}
